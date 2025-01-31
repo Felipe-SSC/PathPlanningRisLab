@@ -1,0 +1,22 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/felipe/turtlebot3/build/turtlebot3_teleop",
+        "/home/felipe/turtlebot3/install/turtlebot3_teleop/lib/python3.10/site-packages",
+        "/home/felipe/turtlebot3/build/turtlebot3_example",
+        "/home/felipe/turtlebot3/install/turtlebot3_example/lib/python3.10/site-packages",
+        "/home/felipe/turtlebot3/build/nav_controller",
+        "/home/felipe/turtlebot3/install/nav_controller/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/felipe/turtlebot3/build/turtlebot3_teleop",
+        "/home/felipe/turtlebot3/install/turtlebot3_teleop/lib/python3.10/site-packages",
+        "/home/felipe/turtlebot3/build/turtlebot3_example",
+        "/home/felipe/turtlebot3/install/turtlebot3_example/lib/python3.10/site-packages",
+        "/home/felipe/turtlebot3/build/nav_controller",
+        "/home/felipe/turtlebot3/install/nav_controller/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ]
+}
