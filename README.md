@@ -119,4 +119,9 @@ o
     ```
 5. Visualizar resultados:
    El script permite visualizar en rviz2 el path a seguir, y además escribe en un .csv que contiene datos relevantes respecto al rendimiento del robot en su simulacion.
+
+##### Respecto al paquete nav_controller:
+El paquete presente en el repositorio cuenta con cambios específicos realizados al paquete original producido por abdulkadrtr (https://github.com/abdulkadrtr/ROS2-PurePursuitControl-PathPlanning-Tracking).
+Los cambios corresponden a modificaciones del script para recopilar información, asi como para implementar dos métodos de calculo de distancia al momento de generar una trayectoria.
+
    
