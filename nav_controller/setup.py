@@ -1,6 +1,4 @@
 from setuptools import setup
-import os
-from glob import glob
 
 package_name = 'nav_controller'
 
@@ -9,10 +7,9 @@ setup(
     version='0.0.0',
     packages=[package_name],
     data_files=[
-        ('share/ament_index/resource_index/packages',['resource/' + package_name]),
+        ('share/ament_index/resource_index/packages',
+            ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
-        (os.path.join('share', package_name, 'config'), glob('config/*')),        
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -23,7 +20,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-        	'control = nav_controller.control:main'
+        	'manhattan = nav_controller.controlManhattan:main',
+            'euclidean = nav_controller.controlEuclidean:main',
+            'meta = nav_controller.meta:main',
         ],
     },
 )
