@@ -9,6 +9,10 @@ A continuación se encuentran las instrucciones para poder visualizar el funcion
 5. slam_toolbox
 6. rviz2
 7. ROS2-PurePursuitControl-PathPlanning-Tracking by abdulkadrtr
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/c1c97960-ff65-4a18-b758-3eaf8a0c6e68" alt="Pure Pursuit" width="600">
+</div>
+
 
 ## Instalación ROS2-Humble:
 
@@ -101,7 +105,7 @@ Para mover el robot en el mundo simulado se puede realizar de la siguiente maner
   ```
 ### Path Planning y navegación autónoma:
 Para producir un path que seguirá el robot, es necesario lo siguiente:
-1. Tener el area de navegación previamente mapeada (Si el destino esta en un sector 'desconocido' o 'ocupado' el robot planeará una trayectoria hasta el ultimo punto conocido)
+1. Tener el area de navegación previamente mapeada
 2. rviz2 abierto con el fixed frame 'map'
 3. Ejecutar el script de Path Planning:
 ```bash
@@ -119,9 +123,12 @@ o
     ```
 5. Visualizar resultados:
    El script permite visualizar en rviz2 el path a seguir, y además escribe en un .csv que contiene datos relevantes respecto al rendimiento del robot en su simulacion.
+> [!WARNING]
+ > Si el destino esta en un sector 'desconocido' o 'ocupado' el robot planeará una trayectoria hasta el ultimo punto conocido
 
-##### Respecto al paquete nav_controller:
-El paquete presente en el repositorio cuenta con cambios específicos realizados al paquete original producido por abdulkadrtr (https://github.com/abdulkadrtr/ROS2-PurePursuitControl-PathPlanning-Tracking).
-Los cambios corresponden a modificaciones del script para recopilar información, asi como para implementar dos métodos de calculo de distancia al momento de generar una trayectoria.
+> [!NOTE]
+> Respecto al paquete nav_controller:
+> El paquete presente en el repositorio cuenta con cambios específicos realizados al paquete original producido por abdulkadrtr (https://github.com/abdulkadrtr/ROS2-PurePursuitControl-PathPlanning-Tracking).
+> Los cambios corresponden a modificaciones del script para recopilar información, asi como para implementar dos métodos de calculo de distancia al momento de generar una trayectoria.
 
    
