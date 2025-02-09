@@ -1,9 +1,7 @@
 import rclpy
-import numpy as np
 import csv
 
 from nav_controller.funciones import *
-
 
 def heuristic(a, b):
     # Implementacion Manhattan
@@ -12,12 +10,11 @@ def heuristic(a, b):
     manhattan = absX + absY
     return manhattan
 
-
 def main(args=None):
 
-    with open("tabla_manhattan.csv", mode="w", newline="") as file:
+    with open("tablaDatos.csv", mode="w", newline="") as file:
         writer = csv.writer(file)
-        writer.writerow(["X Deseada", "Y Deseada", "Tiempo Path Building", "Tiempo de Trayectoria", "Tiempo Total"])
+        writer.writerow(["X Deseada", "Y Deseada", "Tiempo Path Building", "Tiempo de Trayectoria", "Tiempo Total", "Distancia Total"])
 
 
     rclpy.init(args=args)

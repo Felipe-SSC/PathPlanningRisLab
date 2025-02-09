@@ -3,28 +3,26 @@ import numpy as np
 import heapq
 from nav_msgs.msg import OccupancyGrid , Odometry, Path
 from geometry_msgs.msg import PoseStamped , Twist
+from visualization_msgs.msg import Marker
+from geometry_msgs.msg import Point
 import math
 import scipy.interpolate as si
 from rclpy.qos import QoSProfile
 import csv
 
-lookahead_distance = 0.15  #previamente en 0.15
-speed = 0.1
-expansion_size = 2 #for the wall
+lookahead_distance = 0.35  #previamente en 0.15 (0.35 esta bien quizas un poco menos). Distancia entre el robot y la posicion objetivo en Pure Pursuit
+speed = 0.2 # velocidad del robot
+expansion_size = 4 #distancia de la muralla para el costmap!!! (mas alto mas se aleja de la muralla)
 
 def euler_from_quaternion(x,y,z,w):
-    #t0 = +2.0 * (w * x + y * z)
-    #t1 = +1.0 - 2.0 * (x * x + y * y)
-    #roll_x = math.atan2(t0, t1)
     t2 = +2.0 * (w * y - z * x)
     t2 = +1.0 if t2 > +1.0 else t2
     t2 = -1.0 if t2 < -1.0 else t2
-    #pitch_y = math.asin(t2)
     t3 = +2.0 * (w * z + x * y)
     t4 = +1.0 - 2.0 * (y * y + z * z)
     yaw_z = math.atan2(t3, t4)
     return yaw_z
-
+ 
 
 def astar(array, start, goal, heuristic):
     neighbors = [(0,1),(0,-1),(1,0),(-1,0),(1,1),(1,-1),(-1,1),(-1,-1)]
@@ -69,8 +67,15 @@ def astar(array, start, goal, heuristic):
 
                 heapq.heappush(oheap, (fscore[neighbor], neighbor))
 
-    # If no path to goal was found, return closest path to goal
+    # Si no encuentra un path a la meta, devuelve el path mas cercano (el punto mas cercano a la meta 'conocido')
+    # """
+    # Aquí se podría implementar un funcionamiento de mapeo en tiempo real (obstaculos dinamicos, etc...), 
+    # donde teniendo un path global a la meta, se calcula el path local a seguir basandose en el costmap local que se actualice en cada iteración.
+    # La implementacion mas sencilla es Dynamic Window Aproach (DWA).
+    # """
+    
     if goal not in came_from:
+        #self.get_logger().info("No se encontro la ruta a la meta!!")
         closest_node = None
         closest_dist = float('inf')
         for node in close_set:
@@ -87,56 +92,9 @@ def astar(array, start, goal, heuristic):
             data = data[::-1]
             return data
     return False
- 
 
-def bspline_planning(x, y, sn):
-    N = 2
-    t = range(len(x))
-    x_tup = si.splrep(t, x, k=N)
-    y_tup = si.splrep(t, y, k=N)
 
-    x_list = list(x_tup)
-    xl = x.tolist()
-    x_list[1] = xl + [0.0, 0.0, 0.0, 0.0]
 
-    y_list = list(y_tup)
-    yl = y.tolist()
-    y_list[1] = yl + [0.0, 0.0, 0.0, 0.0]
-
-    ipl_t = np.linspace(0.0, len(x) - 1, sn)
-    rx = si.splev(ipl_t, x_list)
-    ry = si.splev(ipl_t, y_list)
-
-    return rx, ry
-
-def pure_pursuit(current_x, current_y, current_heading, path,index):     ##Funcion que calcula las velocidades necesarias para seguir un path y llegar a un punto.
-    global lookahead_distance
-    closest_point = None              
-    v = speed
-    for i in range(index,len(path)):
-        x = path[i][0]
-        y = path[i][1]
-        distance = math.hypot(current_x - x, current_y - y) ##HAY QUE VARIAR LAS DISTANCIAS PARA VER QUE ES MEJOR!! (https://youtu.be/xqjVTE7QvOg?t=187)
-        if lookahead_distance < distance:
-            closest_point = (x, y)
-            index = i
-            break
-    if closest_point is not None:
-        target_heading = math.atan2(closest_point[1] - current_y, closest_point[0] - current_x)  #calcula el angulo al que debe apuntar el robot
-        desired_steering_angle = target_heading - current_heading #el angulo que debe cambiar el robot para llegar a la siguiente posicion
-    else:
-        target_heading = math.atan2(path[-1][1] - current_y, path[-1][0] - current_x)
-        desired_steering_angle = target_heading - current_heading
-        index = len(path)-1
-    if desired_steering_angle > math.pi:
-        desired_steering_angle -= 2 * math.pi
-    elif desired_steering_angle < -math.pi:
-        desired_steering_angle += 2 * math.pi
-    if desired_steering_angle > math.pi/6 or desired_steering_angle < -math.pi/6:
-        sign = 1 if desired_steering_angle > 0 else -1
-        desired_steering_angle = sign * math.pi/4
-        v = 0.0
-    return v,desired_steering_angle,index
 
 def costmap(data,width,height,resolution):
     data = np.array(data).reshape(height,width)
@@ -152,6 +110,38 @@ def costmap(data,width,height,resolution):
             data[x,y] = 100
     data = data*resolution
     return data
+
+def pure_pursuit(current_x, current_y, current_heading, path,index, navigationControl):     ##Funcion que calcula las velocidades necesarias para seguir un path y llegar a un punto.
+    global lookahead_distance
+    closest_point = None              
+    v = speed
+    for i in range(index,len(path)):
+        x = path[i][0]
+        y = path[i][1]
+        distance = math.hypot(current_x - x, current_y - y) ##HAY QUE VARIAR LAS DISTANCIAS PARA VER QUE ES MEJOR!! (https://youtu.be/xqjVTE7QvOg?t=187)
+        if lookahead_distance < distance:
+            closest_point = (x, y)
+            index = i
+            break
+    if closest_point is not None:
+        target_heading = math.atan2(closest_point[1] - current_y, closest_point[0] - current_x)  #calcula el angulo al que debe apuntar el robot
+        desired_steering_angle = target_heading - current_heading #el angulo que debe cambiar el robot para llegar a la siguiente posicion
+        navigationControl.publish_marker(closest_point[0], closest_point[1])
+    else:
+        target_heading = math.atan2(path[-1][1] - current_y, path[-1][0] - current_x)
+        desired_steering_angle = target_heading - current_heading
+        index = len(path)-1
+        navigationControl.publish_marker(path[-1][0], path[-1][1])
+
+    if desired_steering_angle > math.pi:
+        desired_steering_angle -= 2 * math.pi
+    elif desired_steering_angle < -math.pi:
+        desired_steering_angle += 2 * math.pi
+    if desired_steering_angle > math.pi/6 or desired_steering_angle < -math.pi/6:
+        sign = 1 if desired_steering_angle > 0 else -1
+        desired_steering_angle = sign * math.pi/4
+        v = 0.0
+    return v,desired_steering_angle,index
 
 def bspline_planning(array, sn):
     try:
@@ -198,6 +188,7 @@ class navigationControl(Node):
         self.subscription = self.create_subscription(PoseStamped,'goal_pose',self.goal_pose_callback,QoSProfile(depth=10))
         self.vel_publisher = self.create_publisher(Twist, 'cmd_vel', 10)
         self.path_publisher = self.create_publisher(Path, 'planned_path', 10)
+        self.pursue_publisher_ = self.create_publisher(Marker, '/pure_pursuit_target', 10)
         timer_period = 0.01
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.flag = 0
@@ -210,7 +201,29 @@ class navigationControl(Node):
         self.goal_1 = 0
         self.path_0 = 0
         self.path_1 = 0
-        
+        self.total_length = 0.0
+        self.flag_logger = 0
+    
+    
+    def publish_marker(self, x, y):
+        marker = Marker()
+        marker.header.frame_id = 'map'  # O el marco adecuado
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = 'pure_pursuit'
+        marker.id = 0
+        marker.type = Marker.SPHERE
+        marker.action = Marker.ADD
+        marker.pose.position = Point(x=x, y=y, z=0.0)
+        marker.scale.x = 0.1  # Tamaño de la esfera
+        marker.scale.y = 0.1
+        marker.scale.z = 0.1
+        marker.color.a = 1.0  # Opacidad
+        marker.color.r = 1.0  # Color rojo
+        marker.color.g = 0.0
+        marker.color.b = 0.0
+        self.pursue_publisher_.publish(marker)
+
+
     def goal_pose_callback(self,msg):  #Funcion que se suscribe al /goal_pose y printea la posicion de destino.
         
         self.goal_0 = self.get_clock().now()
@@ -272,11 +285,15 @@ class navigationControl(Node):
                 pose.pose.orientation.w = 1.0  # Sin rotación
                 path_msg.poses.append(pose)
 
+
             self.path_1 = self.get_clock().now()
 
             self.pathBuildTime = ((self.path_1 - self.path_0).nanoseconds / 1e9)
             
-            ######
+            ##calculo de distancia path
+            self.path_length(self.path, self.heuristic)
+            
+            
             self.move_0 = self.get_clock().now()
 
             self.path_publisher.publish(path_msg)
@@ -285,12 +302,29 @@ class navigationControl(Node):
             
             self.flag = 2
 
+    def path_length(self, path, heuristic):
+        for i in range(len(path) - 1):
+            self.total_length += heuristic(path[i], path[i+1])
+        return self.total_length
+    
+    def printData(self):
+        self.get_logger().info(f'Printeando data en el archivo')
+        with open('tablaDatos.csv', mode="a", newline="") as file:  # Cambié "w" por "a" para evitar sobreescribir
+            writer = csv.writer(file)
+            writer.writerow([
+                aproximar_a_cero(self.goal[0]),
+                aproximar_a_cero(self.goal[1]),
+                self.pathBuildTime,
+                self.time_moverse,
+                self.timeGoal,
+                self.total_length
+            ])
+
     def timer_callback(self):  ##Funcion para publicar las velocidades calculadas en Pure Pursuit. Ademas verifica si el robot ha llegado al ultimo pose del PATH   
         if self.flag == 2:
-            
-            self.get_logger().info("Comenzando a moverse!") ##get current time!
+            self.get_logger().info('Path generado! Publicando twist')
             twist = Twist()
-            twist.linear.x , twist.angular.z,self.i = pure_pursuit(self.x,self.y,self.yaw,self.path,self.i)
+            twist.linear.x , twist.angular.z,self.i = pure_pursuit(self.x,self.y,self.yaw,self.path,self.i, navigationControl=self)
             if(abs(self.x - self.path[-1][0]) < 0.05 and abs(self.y - self.path[-1][1])< 0.05):   #mi posicion (x, y) == la última pos. del PATH (x, y) (con error de 0.05) *****
                 twist.linear.x = 0.0
                 twist.angular.z = 0.0
@@ -303,11 +337,7 @@ class navigationControl(Node):
                 self.goal_1 = self.get_clock().now()
                 
                 self.timeGoal = ((self.goal_1 - self.goal_0).nanoseconds / 1e9)
-
-                with open("tabla_euclidean.csv", mode="a", newline="") as file:
-                    writer = csv.writer(file)
-                    writer.writerow([aproximar_a_cero(self.goal[0]), aproximar_a_cero(self.goal[1]), self.pathBuildTime, self.time_moverse, self.timeGoal])
-
+                self.printData()
                 print("Objetivo alcanzado!!\nEsperando nuevo objetivo...")
 
             self.vel_publisher.publish(twist) 
