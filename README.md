@@ -109,11 +109,16 @@ Para producir un path que seguirá el robot, es necesario lo siguiente:
 2. rviz2 abierto con el fixed frame 'map'
 3. Ejecutar el script de Path Planning:
 ```bash
-  ros2 run nav_controller euclidean
+  ros2 run nav_controller euclideanA
   ```
 o
 ```bash
-  ros2 run nav_controller manhattan
+  ros2 run nav_controller manhattanA
+  ```
+
+o
+```bash
+  ros2 run nav_controller djikstra
   ```
 4. Otorgar Goal Pose y 2D Estimated Pose
    Se puede realizar a través de Rviz2 o ejecutando el siguiente archivo:
