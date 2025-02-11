@@ -5,10 +5,10 @@ A continuación se encuentran las instrucciones para poder visualizar el funcion
 1. ROS2 Humble
 2. Gazebo Classic
 3. Turtlebot3 by ROBOTIS-GIT
-4. turtlebot3_simulations by ROBOTIS-GIT
+4. turtlebot3_simulations by ROBOTIS-GIT (utilizar turtlebot3_gazebo de este repositorio)
 5. slam_toolbox
 6. rviz2
-7. ROS2-PurePursuitControl-PathPlanning-Tracking by abdulkadrtr
+7. nav_controller de este repositorio.
 <div align="center">
   <img src="https://github.com/user-attachments/assets/c1c97960-ff65-4a18-b758-3eaf8a0c6e68" alt="Pure Pursuit" width="600">
 </div>
