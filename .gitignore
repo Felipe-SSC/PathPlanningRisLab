@@ -38,7 +38,7 @@ srv/_*.py
 qtcreator-*
 *.user
 
-.vscode
+.vscode/
 
 /planning/cfg
 /planning/docs
