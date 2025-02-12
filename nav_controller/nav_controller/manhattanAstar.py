@@ -11,6 +11,8 @@ def heuristic(a, b):
     manhattan = absX + absY
     return manhattan
 
+heuristic.__name__ = "Astar-Manhattan"
+
 def main(args=None):
 
     file_path = "tablaDatos.csv"

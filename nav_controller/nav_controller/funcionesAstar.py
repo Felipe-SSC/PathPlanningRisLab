@@ -291,7 +291,7 @@ class navigationControl(Node):
             self.pathBuildTime = ((self.path_1 - self.path_0).nanoseconds / 1e9)
             
             ##calculo de distancia path
-            self.path_length(self.path, self.heuristic)
+            self.path_length(self.path)
             
             
             self.move_0 = self.get_clock().now()
@@ -317,7 +317,7 @@ class navigationControl(Node):
             writer = csv.writer(file)
 
             # Escribir un separador identificando la simulación
-            writer.writerow([f'--- Simulación {heuristic} ---'])
+            writer.writerow([f'--- Simulación {heuristic.__name__} ---'])
 
             # Escribir los datos de la simulación
             writer.writerow([

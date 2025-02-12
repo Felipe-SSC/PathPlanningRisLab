@@ -9,6 +9,8 @@ def heuristic(a, b):
     # Implementacion Euclidiana
     return np.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
 
+heuristic.__name__ = "Astar-Euclidiana"
+
 def main(args=None):
 
     file_path = "tablaDatos.csv"
