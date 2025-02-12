@@ -38,7 +38,8 @@ srv/_*.py
 qtcreator-*
 *.user
 
-.vscode/
+/nav_controller/.vscode/
+/nav_controller/nav_controller/.vscode/
 
 /planning/cfg
 /planning/docs
