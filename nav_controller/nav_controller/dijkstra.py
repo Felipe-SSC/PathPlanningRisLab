@@ -1,188 +1,105 @@
 from rclpy.node import Node
-import numpy as np
 import heapq
+import rclpy
+import math
 from nav_msgs.msg import OccupancyGrid , Odometry, Path
 from geometry_msgs.msg import PoseStamped , Twist
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point
-import math
-import scipy.interpolate as si
 from rclpy.qos import QoSProfile
 import csv
+import os
 
-lookahead_distance = 0.35  #previamente en 0.15 (0.35 esta bien quizas un poco menos). Distancia entre el robot y la posicion objetivo en Pure Pursuit
-speed = 0.2 # velocidad del robot
-expansion_size = 4 #distancia de la muralla para el costmap!!! (mas alto mas se aleja de la muralla)
+from nav_controller.funcionesAstar import euler_from_quaternion, bspline_planning, aproximar_a_cero, costmap, pure_pursuit
 
-def euler_from_quaternion(x,y,z,w):
-    t2 = +2.0 * (w * y - z * x)
-    t2 = +1.0 if t2 > +1.0 else t2
-    t2 = -1.0 if t2 < -1.0 else t2
-    t3 = +2.0 * (w * z + x * y)
-    t4 = +1.0 - 2.0 * (y * y + z * z)
-    yaw_z = math.atan2(t3, t4)
-    return yaw_z
- 
+#Nombre:
+SIMULACION = 'Djikstra'
 
-def astar(array, start, goal, heuristic):
+
+
+def dijkstra(self, array, start, goal):
     neighbors = [(0,1),(0,-1),(1,0),(-1,0),(1,1),(1,-1),(-1,1),(-1,-1)]
-    close_set = set()
-    came_from = {}
-    gscore = {start:0}
-    fscore = {start:heuristic(start, goal)}
-    oheap = []
-    heapq.heappush(oheap, (fscore[start], start))
     
-    while oheap:
-        current = heapq.heappop(oheap)[1]
+    
+    closed_set = set()  # Nodos ya evaluados
+    came_from = {}      # Diccionario para reconstruir el camino
+    gscore = {start: 0} # Costo acumulado desde el inicio
+    open_list = []      # Cola de prioridad para nodos pendientes
+    
+    # Inicializar con el nodo de inicio
+    heapq.heappush(open_list, (gscore[start], start))
+    
+    #mientras falten nodos por revisar
+    while open_list:
+        # Obtener el nodo con el menor costo acumulado
+        current = heapq.heappop(open_list)[1]
+        
+        # Si llegamos al objetivo, reconstruir y devolver el camino
         if current == goal:
-            data = []
+            path = []
             while current in came_from:
-                data.append(current)
+                path.append(current)
                 current = came_from[current]
-            data = data + [start]
-            data = data[::-1]
-            return data
-        close_set.add(current)
+            path = path + [start]
+            path = path[::-1]  # Invertir para obtener el camino desde el inicio
+            return path
+        
+        # Marcar el nodo actual como evaluado
+        closed_set.add(current)
+        
+        # Explorar los vecinos
         for i, j in neighbors:
             neighbor = current[0] + i, current[1] + j
-            tentative_g_score = gscore[current] + heuristic(current, neighbor)
-            if 0 <= neighbor[0] < array.shape[0]:
-                if 0 <= neighbor[1] < array.shape[1]:                
-                    if array[neighbor[0]][neighbor[1]] == 1:
-                        continue
-                else:
-                    # array bound y walls
+            
+            # Verificar si el vecino está dentro de los límites del array
+            if 0 <= neighbor[0] < array.shape[0] and 0 <= neighbor[1] < array.shape[1]:
+                # Si el vecino es un obstáculo, ignorarlo
+                if array[neighbor[0]][neighbor[1]] == 1:
                     continue
             else:
-                # array bound x walls
+                # Si el vecino está fuera de los límites, ignorarlo
                 continue
-            if neighbor in close_set and tentative_g_score >= gscore.get(neighbor, 0):
+            
+            # Calcular el costo acumulado tentativo para el vecino
+            tentative_g_score = gscore[current] + 1  # Costo uniforme (1 por paso)
+            
+            # Si el vecino ya fue evaluado y el nuevo costo no es mejor, ignorarlo
+            if neighbor in closed_set and tentative_g_score >= gscore.get(neighbor, 0):
                 continue
-            if  tentative_g_score < gscore.get(neighbor, 0) or neighbor not in [i[1]for i in oheap]:
-                came_from[neighbor] = current
-                gscore[neighbor] = tentative_g_score
-                fscore[neighbor] = tentative_g_score + heuristic(neighbor, goal)
-
-
-                heapq.heappush(oheap, (fscore[neighbor], neighbor))
-
-    # Si no encuentra un path a la meta, devuelve el path mas cercano (el punto mas cercano a la meta 'conocido')
-    # """
-    # Aquí se podría implementar un funcionamiento de mapeo en tiempo real (obstaculos dinamicos, etc...), 
-    # donde teniendo un path global a la meta, se calcula el path local a seguir basandose en el costmap local que se actualice en cada iteración.
-    # La implementacion mas sencilla es Dynamic Window Aproach (DWA).
-    # """
+            
+            # Si el nuevo costo es mejor o el vecino no está en la lista abierta
+            if tentative_g_score < gscore.get(neighbor, 0) or neighbor not in [i[1] for i in open_list]:
+                came_from[neighbor] = current  # Registrar el camino
+                gscore[neighbor] = tentative_g_score  # Actualizar el costo acumulado
+                heapq.heappush(open_list, (gscore[neighbor], neighbor))  # Agregar a la cola
     
+    # Si no se encontró un camino al objetivo, buscar el nodo más cercano
     if goal not in came_from:
-        #self.get_logger().info("No se encontro la ruta a la meta!!")
+        self.get_logger().info("No se encontro la ruta a la meta!!")
         closest_node = None
         closest_dist = float('inf')
-        for node in close_set:
-            dist = heuristic(node, goal)
+        for node in closed_set:
+            # Calcular la distancia Manhattan al objetivo
+            dist = abs(node[0] - goal[0]) + abs(node[1] - goal[1])
             if dist < closest_dist:
                 closest_node = node
                 closest_dist = dist
         if closest_node is not None:
-            data = []
+            # Reconstruir el camino hasta el nodo más cercano
+            path = []
             while closest_node in came_from:
-                data.append(closest_node)
+                path.append(closest_node)
                 closest_node = came_from[closest_node]
-            data = data + [start]
-            data = data[::-1]
-            return data
+            path = path + [start]
+            path = path[::-1]  # Invertir para obtener el camino desde el inicio
+            return path
+    
+    # Si no se encontró ningún camino, devolver False
     return False
 
-
-
-
-def costmap(data,width,height,resolution):
-    data = np.array(data).reshape(height,width)
-    wall = np.where(data == 100)
-    for i in range(-expansion_size,expansion_size+1):
-        for j in range(-expansion_size,expansion_size+1):
-            if i  == 0 and j == 0:
-                continue
-            x = wall[0]+i
-            y = wall[1]+j
-            x = np.clip(x,0,height-1)
-            y = np.clip(y,0,width-1)
-            data[x,y] = 100
-    data = data*resolution
-    return data
-
-def pure_pursuit(current_x, current_y, current_heading, path,index, navigationControl):     ##Funcion que calcula las velocidades necesarias para seguir un path y llegar a un punto.
-    global lookahead_distance
-    closest_point = None              
-    v = speed
-    for i in range(index,len(path)):
-        x = path[i][0]
-        y = path[i][1]
-        distance = math.hypot(current_x - x, current_y - y) ##HAY QUE VARIAR LAS DISTANCIAS PARA VER QUE ES MEJOR!! (https://youtu.be/xqjVTE7QvOg?t=187)
-        if lookahead_distance < distance:
-            closest_point = (x, y)
-            index = i
-            break
-    if closest_point is not None:
-        target_heading = math.atan2(closest_point[1] - current_y, closest_point[0] - current_x)  #calcula el angulo al que debe apuntar el robot
-        desired_steering_angle = target_heading - current_heading #el angulo que debe cambiar el robot para llegar a la siguiente posicion
-        navigationControl.publish_marker(closest_point[0], closest_point[1])
-    else:
-        target_heading = math.atan2(path[-1][1] - current_y, path[-1][0] - current_x)
-        desired_steering_angle = target_heading - current_heading
-        index = len(path)-1
-        navigationControl.publish_marker(path[-1][0], path[-1][1])
-
-    if desired_steering_angle > math.pi:
-        desired_steering_angle -= 2 * math.pi
-    elif desired_steering_angle < -math.pi:
-        desired_steering_angle += 2 * math.pi
-    if desired_steering_angle > math.pi/6 or desired_steering_angle < -math.pi/6:
-        sign = 1 if desired_steering_angle > 0 else -1
-        desired_steering_angle = sign * math.pi/4
-        v = 0.0
-    return v,desired_steering_angle,index
-
-def bspline_planning(array, sn):
-    try:
-        array = np.array(array)
-        x = array[:, 0]
-        y = array[:, 1]
-        N = 2
-        t = range(len(x))
-        x_tup = si.splrep(t, x, k=N)
-        y_tup = si.splrep(t, y, k=N)
-
-        x_list = list(x_tup)
-        xl = x.tolist()
-        x_list[1] = xl + [0.0, 0.0, 0.0, 0.0]
-
-        y_list = list(y_tup)
-        yl = y.tolist()
-        y_list[1] = yl + [0.0, 0.0, 0.0, 0.0]
-
-        ipl_t = np.linspace(0.0, len(x) - 1, sn)
-        rx = si.splev(ipl_t, x_list)
-        ry = si.splev(ipl_t, y_list)
-        path = [(rx[i],ry[i]) for i in range(len(rx))]
-    except:
-        path = array
-    return path
-
-def aproximar_a_cero(valores, epsilon=1e-6):
-  
-    # Si valores es un número único
-    if isinstance(valores, (int, float, np.float64)):
-        return 0 if abs(valores) < epsilon else valores
-
-    # Si valores es un iterable
-    return [0 if abs(v) < epsilon else v for v in valores]
-        
-
 class navigationControl(Node):
-    def __init__(self, heuristic):
+    def __init__(self):
         super().__init__('Navigation')
-        self.heuristic = heuristic
         self.subscription = self.create_subscription(OccupancyGrid,'map',self.listener_callback, 10)
         self.subscription = self.create_subscription(Odometry,'odom',self.info_callback,10)
         self.subscription = self.create_subscription(PoseStamped,'goal_pose',self.goal_pose_callback,QoSProfile(depth=10))
@@ -201,7 +118,7 @@ class navigationControl(Node):
         self.goal_1 = 0
         self.path_0 = 0
         self.path_1 = 0
-        self.total_length = 0.0
+        self.total_length = 0
         self.flag_logger = 0
     
     
@@ -249,7 +166,7 @@ class navigationControl(Node):
             #Conversion de las coordenadas del objetivo a indices del Costmap
             columnH = int((self.goal[0]- originX)/resolution)
             rowH = int((self.goal[1]- originY)/resolution)
-
+            self.get_logger().info(f'El goal es: {self.goal[0],self.goal[1]}')
 
             #Para trabajar con el costmap, se crea una instancia con el nombre 'data'
             data = costmap(msg.data,msg.info.width,msg.info.height,resolution) 
@@ -257,11 +174,11 @@ class navigationControl(Node):
             data[data < 0] = 1 #Celdas desconocidas se convierten en obstáculos
             data[data > 5] = 1  #Celdas con ALTO COSTO se convierten en obstáculos
 
-            self.get_logger().info('Generando un PATH con A*')
+            self.get_logger().info('Generando un PATH con Dijkstra')
             
             self.path_0 = self.get_clock().now()
             
-            path = astar(data,(row,column),(rowH,columnH), self.heuristic) #Busqueda de ruta con A*
+            path = dijkstra(self, data,(row,column),(rowH,columnH)) #Busqueda de ruta con Dijkstra
             ## -> Resulta en una lista de indices (fila, columna) que representa la ruta.
             
             path = [(p[1]*resolution+originX,p[0]*resolution+originY) for p in path] #Convertir indices a coordenadas (x, y)
@@ -291,8 +208,8 @@ class navigationControl(Node):
             self.pathBuildTime = ((self.path_1 - self.path_0).nanoseconds / 1e9)
             
             ##calculo de distancia path
-            self.path_length(self.path, self.heuristic)
-            
+            self.path_length(self.path)
+            self.get_logger().info(f'La distancia total es: {self.total_length}')
             
             self.move_0 = self.get_clock().now()
 
@@ -302,15 +219,24 @@ class navigationControl(Node):
             
             self.flag = 2
 
-    def path_length(self, path, heuristic):
+    def path_length(self, path):
+        self.total_length = 0
         for i in range(len(path) - 1):
-            self.total_length += heuristic(path[i], path[i+1])
+            x1, y1 = path[i]
+            x2, y2 = path[i + 1]
+            self.total_length += math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
         return self.total_length
-    
+
     def printData(self):
-        self.get_logger().info(f'Printeando data en el archivo')
-        with open('tablaDatos.csv', mode="a", newline="") as file:  # Cambié "w" por "a" para evitar sobreescribir
+        self.get_logger().info(f'Guardando datos en el archivo')
+
+        with open('tablaDatos.csv', mode="a", newline="") as file:  
             writer = csv.writer(file)
+
+            # Escribir un separador identificando la simulación
+            writer.writerow([f'--- Simulación {SIMULACION} ---'])
+
+            # Escribir los datos de la simulación
             writer.writerow([
                 aproximar_a_cero(self.goal[0]),
                 aproximar_a_cero(self.goal[1]),
@@ -319,10 +245,11 @@ class navigationControl(Node):
                 self.timeGoal,
                 self.total_length
             ])
+            writer.writerow([]) #en blanco
+
 
     def timer_callback(self):  ##Funcion para publicar las velocidades calculadas en Pure Pursuit. Ademas verifica si el robot ha llegado al ultimo pose del PATH   
         if self.flag == 2:
-            self.get_logger().info('Path generado! Publicando twist')
             twist = Twist()
             twist.linear.x , twist.angular.z,self.i = pure_pursuit(self.x,self.y,self.yaw,self.path,self.i, navigationControl=self)
             if(abs(self.x - self.path[-1][0]) < 0.05 and abs(self.y - self.path[-1][1])< 0.05):   #mi posicion (x, y) == la última pos. del PATH (x, y) (con error de 0.05) *****
@@ -348,3 +275,26 @@ class navigationControl(Node):
         self.yaw = euler_from_quaternion(msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,
         msg.pose.pose.orientation.z,msg.pose.pose.orientation.w)
 
+def main(args=None):
+
+    file_path = "tablaDatos.csv"
+
+    # Comprobar si el archivo ya existe y tiene contenido
+    file_exists = os.path.exists(file_path) and os.path.getsize(file_path) > 0
+
+    with open(file_path, mode="a", newline="") as file:  
+        writer = csv.writer(file)
+
+        # Si el archivo no existe o está vacío, escribir los encabezados
+        if not file_exists:
+            writer.writerow(["X Deseada", "Y Deseada", "Tiempo Path Building", "Tiempo de Trayectoria", "Tiempo Total", "Distancia Total"])
+
+
+    rclpy.init(args=args)
+    navigation_control = navigationControl()
+    rclpy.spin(navigation_control)
+    navigation_control.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

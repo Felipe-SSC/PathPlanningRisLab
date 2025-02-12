@@ -20,8 +20,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-        	'manhattan = nav_controller.controlManhattan:main',
-            'euclidean = nav_controller.controlEuclidean:main',
+        	'manhattanA = nav_controller.manhattanAstar:main',
+            'euclideanA = nav_controller.euclideanAstar:main',
+            'djikstra = nav_controller.dijkstra:main',
             'meta = nav_controller.meta:main',
         ],
     },
