@@ -24,6 +24,9 @@ setup(
             'euclideanA = nav_controller.euclideanAstar:main',
             'djikstra = nav_controller.dijkstra:main',
             'meta = nav_controller.meta:main',
+            'inicio = nav_controller.inicio:main',
+            'square = nav_controller.cuadradoBasic:main',
+            'odom = nav_controller.odometry:main',
         ],
     },
 )

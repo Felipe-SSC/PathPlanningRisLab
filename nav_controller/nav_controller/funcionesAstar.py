@@ -177,8 +177,7 @@ def aproximar_a_cero(valores, epsilon=1e-6):
 
     # Si valores es un iterable
     return [0 if abs(v) < epsilon else v for v in valores]
-        
-
+    
 class navigationControl(Node):
     def __init__(self, heuristic):
         super().__init__('Navigation')
@@ -189,6 +188,7 @@ class navigationControl(Node):
         self.vel_publisher = self.create_publisher(Twist, 'cmd_vel', 10)
         self.path_publisher = self.create_publisher(Path, 'planned_path', 10)
         self.pursue_publisher_ = self.create_publisher(Marker, '/pure_pursuit_target', 10)
+        self.robot_path_publisher = self.create_publisher(Path, '/robot_path', 10)
         timer_period = 0.01
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.flag = 0
@@ -203,7 +203,7 @@ class navigationControl(Node):
         self.path_1 = 0
         self.total_length = 0.0
         self.flag_logger = 0
-    
+        self.puntos_recorridos = []
     
     def publish_marker(self, x, y):
         marker = Marker()
@@ -335,6 +335,30 @@ class navigationControl(Node):
             self.get_logger().info('Path generado! Publicando twist')
             twist = Twist()
             twist.linear.x , twist.angular.z,self.i = pure_pursuit(self.x,self.y,self.yaw,self.path,self.i, navigationControl=self)
+                
+            #----------------------------------------------------------------------------------------
+            # Creacion de path recorrido por el robot en rviz
+            robot_path_msg = Path()
+            robot_path_msg.header.frame_id = "map"  # Asegúrate de que el frame sea el correcto para tu caso
+            robot_path_msg.header.stamp = self.get_clock().now().to_msg()
+
+            # Agregar los puntos recorridos al path
+            for punto in self.puntos_recorridos:
+                pose = PoseStamped()
+                pose.header.frame_id = "map"
+                pose.header.stamp = self.get_clock().now().to_msg()
+                pose.pose.position.x = float(punto[0])
+                pose.pose.position.y = float(punto[1])
+                pose.pose.position.z = 0.0
+                pose.pose.orientation.w = 1.0  # Sin rotación (puedes ajustarlo si es necesario)
+                robot_path_msg.poses.append(pose)
+
+            self.puntos_recorridos.append((self.x, self.y))
+            #----------------------------------------------------------------------------------------           
+            # Publicar el path de los puntos recorridos
+            
+            self.robot_path_publisher.publish(robot_path_msg)
+
             if(abs(self.x - self.path[-1][0]) < 0.05 and abs(self.y - self.path[-1][1])< 0.05):   #mi posicion (x, y) == la última pos. del PATH (x, y) (con error de 0.05) *****
                 twist.linear.x = 0.0
                 twist.angular.z = 0.0
@@ -347,6 +371,8 @@ class navigationControl(Node):
                 self.goal_1 = self.get_clock().now()
                 
                 self.timeGoal = ((self.goal_1 - self.goal_0).nanoseconds / 1e9)
+                #CALCULO LONGITUD PATH ROBOT 
+                self.puntos_recorridos = []
                 self.printData(self.heuristic)
                 print("Objetivo alcanzado!!\nEsperando nuevo objetivo...")
 
@@ -357,4 +383,5 @@ class navigationControl(Node):
         self.y = msg.pose.pose.position.y
         self.yaw = euler_from_quaternion(msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,
         msg.pose.pose.orientation.z,msg.pose.pose.orientation.w)
+        
 
