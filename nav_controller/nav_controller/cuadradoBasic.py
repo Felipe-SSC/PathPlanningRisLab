@@ -7,7 +7,6 @@ from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist
 import math
 import numpy as np
-from scipy.signal import lfilter
 
 def euler_from_quaternion(quaternion):
        x = quaternion[0]
@@ -40,8 +39,8 @@ class Trajectory(Node):
         self.NptosLado = round(self.longitud / (self.velTrayectoria * self.tm))
         self.wfilter = 0
         
-        self.path = [2.00, 2.00, 0, 2.00, 2.00, 0], [0, 2.00, 2.00, 2.00, 0, 0]
-        
+        self.pathMapeo = [2.00, 2.00, 0, 2.00, 2.00, 0], [0, 2.00, 2.00, 2.00, 0, 0]
+
         # Variables de posicion
         self.posX = 0
         self.posY = 0
@@ -86,7 +85,7 @@ class Trajectory(Node):
         self.final_yaw_reached = False
 
     def timer_callback(self):
-        self.posX_list, self.posY_list = self.path
+        self.posX_list, self.posY_list = self.pathMapeo
         if self.index < len(self.posX_list):  # Asegurarse de no exceder los límites
             self.posX_deseada = self.posX_list[self.index]
             self.posY_deseada = self.posY_list[self.index]
