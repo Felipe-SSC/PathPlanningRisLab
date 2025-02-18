@@ -29,7 +29,7 @@ def normalizeAngle(angle):
 
 
 class Trajectory(Node):
-    def __init__(self, nombreNodo):
+    def __init__(self, nombreNodo, pathMapeo):
         super().__init__(nombreNodo)
 
         #----------Pathing-----------
@@ -39,7 +39,9 @@ class Trajectory(Node):
         self.NptosLado = round(self.longitud / (self.velTrayectoria * self.tm))
         self.wfilter = 0
         
-        self.pathMapeo = [2.00, 2.00, 0, 2.00, 2.00, 0], [0, 2.00, 2.00, 2.00, 0, 0]
+        self.pathMapeo = pathMapeo
+        #[2.00, 2.00, 0, 2.00, 2.00, 0], [0, 2.00, 2.00, 2.00, 0, 0]
+
 
         # Variables de posicion
         self.posX = 0
@@ -66,12 +68,6 @@ class Trajectory(Node):
             '/odom', 
             self.listener_callback, 
             QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE))
-        
-        # self.suscriberClock = self.create_subscription(
-        #     Clock, 
-        #     '/clock', 
-        #     self.listenerClock_callback, 
-        #     QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE))
         
         # Publisher al cmd_vel
         self.publisher = self.create_publisher(Twist, 'cmd_vel', 10)
@@ -119,6 +115,7 @@ class Trajectory(Node):
                     self.fase = 1                  # Pasamos a la fase 1
                     
                     self.index += 1                # Siguiente posición deseada
+
         elif not self.final_yaw_reached:  # Fase final: Ajustar yaw a 0
             self.anguloDeseado = 0.0  # Apuntar a yaw = 0
             self.angFaltante = self.yaw - self.anguloDeseado
@@ -131,12 +128,14 @@ class Trajectory(Node):
                 self.twist.linear.x = 0.0
                 self.twist.angular.z = 0.0
                 self.final_yaw_reached = True  # Marcar que se alcanzó el yaw final
-                self.get_logger().info("Trayectoria completada y orientación final ajustada.")
+                self.get_logger().info("Trayectoria completada y orientación final ajustada. Matando nodo")
+                
         elif self.final_yaw_reached:
             # Mantener el robot detenido después de completar la trayectoria y el ajuste de yaw
             self.twist.linear.x = 0.0
             self.twist.angular.z = 0.0
             self.publisher.publish(self.twist) # Asegurarse de que se publiquen las velocidades finales
+            self.destroy_node()
         
         self.publisher.publish(self.twist)
 
@@ -149,18 +148,3 @@ class Trajectory(Node):
                       msg.pose.pose.orientation.w]
         
         self.yaw = euler_from_quaternion(quaternion)
-    
-    #def listenerClock_callback(self, msg):
-    #    self.get_logger().info('Clock: "%f"' % msg.clock.sec)
-
-def main(args=None) -> None:
-
-    rclpy.init(args=args)
-    robot = Trajectory('nodeTrajectoryBasic')
-    
-    rclpy.spin(robot)
-    robot.destroy_node()
-    rclpy.shutdown()
-
-if __name__ == '__main__':
-    main()

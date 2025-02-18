@@ -12,7 +12,7 @@ import csv
 
 lookahead_distance = 0.35  #previamente en 0.15 (0.35 esta bien quizas un poco menos). Distancia entre el robot y la posicion objetivo en Pure Pursuit
 speed = 0.2 # velocidad del robot
-expansion_size = 4 #distancia de la muralla para el costmap!!! (mas alto mas se aleja de la muralla)
+expansion_size = 3 #distancia de la muralla para el costmap!!! (mas alto mas se aleja de la muralla, funciona bien con 4)
 
 def euler_from_quaternion(x,y,z,w):
     t2 = +2.0 * (w * y - z * x)
@@ -148,26 +148,24 @@ def bspline_planning(array, sn):
         array = np.array(array)
         x = array[:, 0]
         y = array[:, 1]
-        N = 2
+        N = 3  # Usamos spline cúbica en lugar de cuadrática
         t = range(len(x))
-        x_tup = si.splrep(t, x, k=N)
-        y_tup = si.splrep(t, y, k=N)
 
-        x_list = list(x_tup)
-        xl = x.tolist()
-        x_list[1] = xl + [0.0, 0.0, 0.0, 0.0]
+        # Generamos las splines sin modificar coeficientes manualmente
+        x_tup = si.splrep(t, x, k=N, s=0)
+        y_tup = si.splrep(t, y, k=N, s=0)
 
-        y_list = list(y_tup)
-        yl = y.tolist()
-        y_list[1] = yl + [0.0, 0.0, 0.0, 0.0]
+        # Número de puntos interpolados más controlado
+        ipl_t = np.linspace(0.0, len(x) - 1, len(x) * 2)
+        rx = si.splev(ipl_t, x_tup)
+        ry = si.splev(ipl_t, y_tup)
 
-        ipl_t = np.linspace(0.0, len(x) - 1, sn)
-        rx = si.splev(ipl_t, x_list)
-        ry = si.splev(ipl_t, y_list)
-        path = [(rx[i],ry[i]) for i in range(len(rx))]
-    except:
-        path = array
+        path = [(rx[i], ry[i]) for i in range(len(rx))]
+    except Exception as e:
+        print("Error en B-Spline:", e)
+        path = array  # Si falla, devolvemos el path original
     return path
+
 
 def aproximar_a_cero(valores, epsilon=1e-6):
   
@@ -266,7 +264,7 @@ class navigationControl(Node):
             
             path = [(p[1]*resolution+originX,p[0]*resolution+originY) for p in path] #Convertir indices a coordenadas (x, y)
             
-            self.path = bspline_planning(path,len(path)*5) #Corrección de ruta con BSpline. (Suavizar la ruta)
+            self.path = bspline_planning(path,len(path)*2) #Corrección de ruta con BSpline. (Suavizar la ruta) (antes len*5)
             print("Ubicacion del Robot: ",self.x,self.y)
             
             #Mods para el path:

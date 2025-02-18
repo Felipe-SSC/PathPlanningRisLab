@@ -21,7 +21,7 @@ def generate_launch_description():
     world = os.path.join(
         get_package_share_directory('turtlebot3_gazebo'),
         'worlds',
-        'tree_test1.world'
+        'tree_test2.world'
     )
 
     # Comando para lanzar el servidor de Gazebo con el mundo realista

@@ -1,100 +1,167 @@
+#!/usr/bin/env python3
+
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseStamped
-import time
+from geometry_msgs.msg import Twist
+import math
+import numpy as np
 
-class PosePublisher(Node):
-    def __init__(self):
-        super().__init__('pose_publisher')
+def euler_from_quaternion(quaternion):
+       x = quaternion[0]
+       y = quaternion[1]
+       z = quaternion[2]
+       w = quaternion[3]
+       #sinr_cosp = 2 * (w * x + y * z)
+       #cosr_cosp = 1 - 2 * (x * x + y * y)
+       #roll = np.arctan2(sinr_cosp, cosr_cosp)    # Solo nos interesa el yaw
+       #sinp = 2 * (w * y - z * x)
+       #pitch = np.arcsin(sinp)
+       siny_cosp = 2 * (w * z + x * y)
+       cosy_cosp = 1 - 2 * (y * y + z * z)
+       yaw = np.arctan2(siny_cosp, cosy_cosp)
+   
+       return yaw
 
-        # Suscriptor a /odom
-        self.odometry_suscriber = self.create_subscription(Odometry, 'odom', self.odom_callback, 10)
+def normalizeAngle(angle):
+        return (angle + np.pi) % (2 * np.pi) - np.pi
+
+
+class Trajectory(Node):
+    def __init__(self, nombreNodo):
+        super().__init__(nombreNodo)
+
+        #----------Pathing-----------
+        self.longitud = 2
+        self.velTrayectoria = 0.2
+        self.tm = 1
+        self.NptosLado = round(self.longitud / (self.velTrayectoria * self.tm))
+        self.wfilter = 0
         
-        # Publicadores
-        self.initial_pose_publisher = self.create_publisher(PoseStamped, 'initial_pose', 10)
-        self.goal_pose_publisher = self.create_publisher(PoseStamped, 'goal_pose', 10)
+        self.pathMapeo = [2.00, 2.00, 0], [2.00, 0, 0]
+
+        # Variables de posicion
+        self.posX = 0
+        self.posY = 0
+        self.yaw = 0
+        self.posX_deseada = 0
+        self.posY_deseada = 0
+
+        # Velocidades
+        self.vel_linear_x = 0.4
+        self.vel_angular_z = 0.2
+
+        # Errores
+        self.linear_error = 0.08
+        self.angular_error = 0.05
+
+        # Indice para recorrer puntos del pathing
+        self.index = 0
+        self.fase = 1
+
+        # Suscriber al odometry
+        self.suscriber = self.create_subscription(
+            Odometry, 
+            '/odom', 
+            self.listener_callback, 
+            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE))
         
-        # Variables para almacenar la posición y orientación inicial
-        self.initial_x = None
-        self.initial_y = None
-        self.initial_orientation = None  # Guardar la orientación en cuaterniones
+        # self.suscriberClock = self.create_subscription(
+        #     Clock, 
+        #     '/clock', 
+        #     self.listenerClock_callback, 
+        #     QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE))
+        
+        # Publisher al cmd_vel
+        self.publisher = self.create_publisher(Twist, 'cmd_vel', 10)
+        
+        # Tipo de mensaje que se publica en cmd_vel
+        self.twist = Twist()
 
-        # Bandera para indicar si se envió la posición inicial
-        self.initial_pose_sent = False
+        # Creacion de timer --> para publicar timer_callback
+        self.timer_period = 0.1
+        self.timer = self.create_timer(self.timer_period, self.timer_callback)
+        self.final_yaw_reached = False
 
-    def odom_callback(self, msg):
-        """Extrae la posición y orientación inicial del robot desde /odom"""
-        if self.initial_x is None and self.initial_y is None:
-            self.initial_x = msg.pose.pose.position.x
-            self.initial_y = msg.pose.pose.position.y
-            self.initial_orientation = msg.pose.pose.orientation  # Guardar la orientación
-            self.get_logger().info(f'Posición inicial guardada: ({self.initial_x}, {self.initial_y})')
+    def timer_callback(self):
+        self.posX_list, self.posY_list = self.pathMapeo
+        if self.index < len(self.posX_list):  # Asegurarse de no exceder los límites
+            self.posX_deseada = self.posX_list[self.index]
+            self.posY_deseada = self.posY_list[self.index]
 
-    def send_initial_pose(self):
-        """Publica la posición inicial en /initial_pose"""
-        if self.initial_x is None or self.initial_y is None or self.initial_orientation is None:
-            self.get_logger().warn('No se ha recibido la odometría aún.')
-            return
+            # Fase 1 : Rotacion 
+            if self.fase == 1:
+                self.anguloDeseado = math.atan2(self.posY_deseada - self.posY, self.posX_deseada - self.posX)
+                self.angFaltante = self.yaw - self.anguloDeseado
+                self.angFaltanteNorm = normalizeAngle(self.angFaltante)
 
-        initial_pose = PoseStamped()
-        initial_pose.header.stamp = self.get_clock().now().to_msg()
-        initial_pose.header.frame_id = 'map'  # Enviar en el marco del mapa si usas AMCL
+                if abs(self.angFaltanteNorm) > self.angular_error:
+                    self.twist.linear.x = 0.0
+                    self.twist.angular.z = self.vel_angular_z if self.angFaltanteNorm < 0 else -self.vel_angular_z
 
-        initial_pose.pose.position.x = self.initial_x
-        initial_pose.pose.position.y = self.initial_y
-        initial_pose.pose.position.z = 0.0
+                else:
+                    self.twist.linear.x = 0.0
+                    self.twist.angular.z = 0.0
+                    self.fase = 2                  # Pasamos a la fase 2
 
-        # Incluir la orientación del robot en cuaterniones
-        initial_pose.pose.orientation = self.initial_orientation
+            # Fase 2 : Movimiento Recta
+            if self.fase == 2:
+                self.distanciaVector = math.sqrt((self.posX - self.posX_deseada)**2 + (self.posY - self.posY_deseada)**2)
+                
+                if self.distanciaVector > self.linear_error:
+                    self.twist.linear.x = self.vel_linear_x
+                    self.twist.angular.z = 0.0
+                
+                else:   # Si estamos dentro del error
+                    self.twist.linear.x = 0.0
+                    self.twist.angular.z = 0.0
+                    self.fase = 1                  # Pasamos a la fase 1
+                    
+                    self.index += 1                # Siguiente posición deseada
+                    
+        elif not self.final_yaw_reached:  # Fase final: Ajustar yaw a 0
+            self.anguloDeseado = 0.0  # Apuntar a yaw = 0
+            self.angFaltante = self.yaw - self.anguloDeseado
+            self.angFaltanteNorm = normalizeAngle(self.angFaltante)
 
-        self.initial_pose_publisher.publish(initial_pose)
-        self.get_logger().info('Initial Pose enviada correctamente.')
-        self.initial_pose_sent = True  # Evita reenviar la pose inicial
+            if abs(self.angFaltanteNorm) > self.angular_error:
+                self.twist.linear.x = 0.0
+                self.twist.angular.z = self.vel_angular_z if self.angFaltanteNorm < 0 else -self.vel_angular_z
+            else:
+                self.twist.linear.x = 0.0
+                self.twist.angular.z = 0.0
+                self.final_yaw_reached = True  # Marcar que se alcanzó el yaw final
+                self.get_logger().info("Trayectoria completada y orientación final ajustada.")
+        elif self.final_yaw_reached:
+            # Mantener el robot detenido después de completar la trayectoria y el ajuste de yaw
+            self.twist.linear.x = 0.0
+            self.twist.angular.z = 0.0
+            self.publisher.publish(self.twist) # Asegurarse de que se publiquen las velocidades finales
+        
+        self.publisher.publish(self.twist)
 
-    def send_goal_pose(self):
-        """Publica la meta en /goal_pose"""
-        goal_pose = PoseStamped()
-        goal_pose.header.stamp = self.get_clock().now().to_msg()
-        goal_pose.header.frame_id = 'map'
+    def listener_callback(self, msg):
+        self.posX = msg.pose.pose.position.x
+        self.posY = msg.pose.pose.position.y
+        quaternion = [msg.pose.pose.orientation.x,
+                      msg.pose.pose.orientation.y,
+                      msg.pose.pose.orientation.z,
+                      msg.pose.pose.orientation.w]
+        
+        self.yaw = euler_from_quaternion(quaternion)
+    
+    #def listenerClock_callback(self, msg):
+    #    self.get_logger().info('Clock: "%f"' % msg.clock.sec)
 
-        goal_pose.pose.position.x = 0.0  # Puedes modificar esta meta
-        goal_pose.pose.position.y = 0.0
-        goal_pose.pose.position.z = 0.0
+def main(args=None) -> None:
 
-        # Mantener la orientación del robot en la pose inicial
-        goal_pose.pose.orientation = self.initial_orientation if self.initial_orientation else self.get_identity_orientation()
-
-        self.goal_pose_publisher.publish(goal_pose)
-        self.get_logger().info('Goal Pose enviada correctamente.')
-
-    def get_identity_orientation(self):
-        """Devuelve una orientación neutra (sin rotación) en cuaterniones"""
-        from geometry_msgs.msg import Quaternion
-        q = Quaternion()
-        q.x, q.y, q.z, q.w = 0.0, 0.0, 0.0, 1.0
-        return q
-
-def main(args=None):
     rclpy.init(args=args)
-
-    node = PosePublisher()
-
-    try:
-        while rclpy.ok():
-            rclpy.spin_once(node, timeout_sec=1.0)  # Procesa callbacks
-
-            if node.initial_x is not None and not node.initial_pose_sent:
-                node.send_initial_pose()
-                time.sleep(1)  # Espera antes de enviar el goal
-                node.send_goal_pose()
-                break  # Termina después de enviar
-
-    except KeyboardInterrupt:
-        pass
-    finally:
-        node.destroy_node()
-        rclpy.shutdown()
+    robot = Trajectory('nodeTrajectoryBasic')
+    
+    rclpy.spin(robot)
+    robot.destroy_node()
+    rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

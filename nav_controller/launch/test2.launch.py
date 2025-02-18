@@ -10,13 +10,13 @@ def generate_launch_description():
     # Lanzar Gazebo con el mundo específico
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(get_package_share_directory('turtlebot3_gazebo'), 'launch', 'tree_test1.launch.py')
+            os.path.join(get_package_share_directory('turtlebot3_gazebo'), 'launch', 'tree_test2.launch.py')
         ),
     )
 
     mapeo = Node(
         package='nav_controller',
-        executable='mapeo1',
+        executable='mapeo2',
         name='mappingNode',
     )
 

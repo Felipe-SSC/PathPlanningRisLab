@@ -61,10 +61,11 @@ def dijkstra(self, array, start, goal):
                 continue
             
             # Calcular el costo acumulado tentativo para el vecino
-            tentative_g_score = gscore[current] + 1  # Costo uniforme (1 por paso)
-            
+            move_cost = 1 if abs(i) + abs(j) == 1 else 1.41
+            tentative_g_score = gscore[current] + move_cost
+
             # Si el vecino ya fue evaluado y el nuevo costo no es mejor, ignorarlo
-            if neighbor in closed_set and tentative_g_score >= gscore.get(neighbor, 0):
+            if neighbor in closed_set and tentative_g_score >= gscore.get(neighbor, float('inf')):
                 continue
             
             # Si el nuevo costo es mejor o el vecino no está en la lista abierta
@@ -186,7 +187,7 @@ class navigationControl(Node):
             
             path = [(p[1]*resolution+originX,p[0]*resolution+originY) for p in path] #Convertir indices a coordenadas (x, y)
             
-            self.path = bspline_planning(path,len(path)*5) #Corrección de ruta con BSpline. (Suavizar la ruta)
+            self.path = bspline_planning(path,len(path)*2) #Corrección de ruta con BSpline. (Suavizar la ruta)
             print("Ubicacion del Robot: ",self.x,self.y)
             
             #Mods para el path:
