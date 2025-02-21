@@ -1,15 +1,19 @@
 import rclpy
-import numpy as np
-import csv
 import os
-
+import csv
+import math
 from nav_controller.funcionesAstar import *
 
 def heuristic(a, b):
-    # Implementacion Euclidiana
-    return np.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
+    D = 1
+    D2 = math.sqrt(2)
+    
+    dx = abs(a[0] - b[0])
+    dy = abs(a[1] - b[1])
+    
+    return D * (dx + dy) + (D2 - 2 * D) * min(dx, dy)
 
-heuristic.__name__ = "Astar-Euclidiana"
+heuristic.__name__ = "Astar-Octile"
 
 def main(args=None):
 
@@ -23,7 +27,7 @@ def main(args=None):
 
         # Si el archivo no existe o está vacío, escribir los encabezados
         if not file_exists:
-            writer.writerow(["Simulación","X Deseada", "Y Deseada", "Tiempo Path Building", "Tiempo de Trayectoria", "Tiempo Total", "Distancia Total","Numero de Giros"])
+            writer.writerow(["Simulacion", "X Deseada", "Y Deseada", "Tiempo Path Building", "Tiempo de Trayectoria", "Tiempo Total", "Distancia Total","Numero de Giros"])
 
 
     rclpy.init(args=args)

@@ -23,77 +23,57 @@ def euler_from_quaternion(x,y,z,w):
     yaw_z = math.atan2(t3, t4)
     return yaw_z
  
-
 def astar(array, start, goal, heuristic):
-    neighbors = [(0,1),(0,-1),(1,0),(-1,0),(1,1),(1,-1),(-1,1),(-1,-1)]
+    """Implementación de A* con soporte para Manhattan, Euclidean y Octile."""
+
+    if heuristic.__name__ == "Astar-Manhattan":
+        neighbors = [(0,1), (0,-1), (1,0), (-1,0)]  # Solo ortogonales
+        cost = lambda dx, dy: 1  # Costo constante
+    else:
+        neighbors = [(0,1), (0,-1), (1,0), (-1,0), (1,1), (1,-1), (-1,1), (-1,-1)]  # Ortogonales + diagonales
+        cost = lambda dx, dy: math.sqrt(dx**2 + dy**2)  # Costo real del movimiento
+
     close_set = set()
     came_from = {}
-    gscore = {start:0}
-    fscore = {start:heuristic(start, goal)}
+    gscore = {start: 0}
+    fscore = {start: heuristic(start, goal)}
     oheap = []
     heapq.heappush(oheap, (fscore[start], start))
     
     while oheap:
         current = heapq.heappop(oheap)[1]
+
         if current == goal:
-            data = []
+            path = []
             while current in came_from:
-                data.append(current)
+                path.append(current)
                 current = came_from[current]
-            data = data + [start]
-            data = data[::-1]
-            return data
+            path.append(start)
+            return path[::-1]
+
         close_set.add(current)
-        for i, j in neighbors:
-            neighbor = current[0] + i, current[1] + j
-            tentative_g_score = gscore[current] + heuristic(current, neighbor)
-            if 0 <= neighbor[0] < array.shape[0]:
-                if 0 <= neighbor[1] < array.shape[1]:                
-                    if array[neighbor[0]][neighbor[1]] == 1:
-                        continue
-                else:
-                    # array bound y walls
-                    continue
-            else:
-                # array bound x walls
+
+        for dx, dy in neighbors:
+            neighbor = (current[0] + dx, current[1] + dy)
+
+            if not (0 <= neighbor[0] < array.shape[0] and 0 <= neighbor[1] < array.shape[1]):
                 continue
-            if neighbor in close_set and tentative_g_score >= gscore.get(neighbor, 0):
+
+            if array[neighbor[0]][neighbor[1]] == 1:
                 continue
-            if  tentative_g_score < gscore.get(neighbor, 0) or neighbor not in [i[1]for i in oheap]:
+
+            tentative_g_score = gscore[current] + cost(dx, dy)
+
+            if neighbor in close_set and tentative_g_score >= gscore.get(neighbor, float('inf')):
+                continue
+
+            if tentative_g_score < gscore.get(neighbor, float('inf')):
                 came_from[neighbor] = current
                 gscore[neighbor] = tentative_g_score
                 fscore[neighbor] = tentative_g_score + heuristic(neighbor, goal)
-
-
                 heapq.heappush(oheap, (fscore[neighbor], neighbor))
 
-    # Si no encuentra un path a la meta, devuelve el path mas cercano (el punto mas cercano a la meta 'conocido')
-    # """
-    # Aquí se podría implementar un funcionamiento de mapeo en tiempo real (obstaculos dinamicos, etc...), 
-    # donde teniendo un path global a la meta, se calcula el path local a seguir basandose en el costmap local que se actualice en cada iteración.
-    # La implementacion mas sencilla es Dynamic Window Aproach (DWA).
-    # """
-    
-    if goal not in came_from:
-        #self.get_logger().info("No se encontro la ruta a la meta!!")
-        closest_node = None
-        closest_dist = float('inf')
-        for node in close_set:
-            dist = heuristic(node, goal)
-            if dist < closest_dist:
-                closest_node = node
-                closest_dist = dist
-        if closest_node is not None:
-            data = []
-            while closest_node in came_from:
-                data.append(closest_node)
-                closest_node = came_from[closest_node]
-            data = data + [start]
-            data = data[::-1]
-            return data
     return False
-
-
 
 
 def costmap(data,width,height,resolution):
@@ -143,7 +123,10 @@ def pure_pursuit(current_x, current_y, current_heading, path,index, navigationCo
         v = 0.0
     return v,desired_steering_angle,index
 
-def bspline_planning(array, sn):
+def bspline_planning(array):
+    #hacemos que no haga nada para analizar el path puro sin suavizar.
+    path = array
+    """
     try:
         array = np.array(array)
         x = array[:, 0]
@@ -156,7 +139,7 @@ def bspline_planning(array, sn):
         y_tup = si.splrep(t, y, k=N, s=0)
 
         # Número de puntos interpolados más controlado
-        ipl_t = np.linspace(0.0, len(x) - 1, len(x) * 2)
+        ipl_t = np.linspace(0.0, len(x) - 1, len(x) * 2) #(antes len*5)
         rx = si.splev(ipl_t, x_tup)
         ry = si.splev(ipl_t, y_tup)
 
@@ -164,6 +147,7 @@ def bspline_planning(array, sn):
     except Exception as e:
         print("Error en B-Spline:", e)
         path = array  # Si falla, devolvemos el path original
+    """
     return path
 
 
@@ -200,9 +184,9 @@ class navigationControl(Node):
         self.path_0 = 0
         self.path_1 = 0
         self.total_length = 0.0
-        self.flag_logger = 0
         self.puntos_recorridos = []
-    
+        self.giros = 0
+
     def publish_marker(self, x, y):
         marker = Marker()
         marker.header.frame_id = 'map'  # O el marco adecuado
@@ -262,10 +246,16 @@ class navigationControl(Node):
             path = astar(data,(row,column),(rowH,columnH), self.heuristic) #Busqueda de ruta con A*
             ## -> Resulta en una lista de indices (fila, columna) que representa la ruta.
             
+            self.path_1 = self.get_clock().now()
+
+            self.pathBuildTime = ((self.path_1 - self.path_0).nanoseconds / 1e9)
+            
+            
             path = [(p[1]*resolution+originX,p[0]*resolution+originY) for p in path] #Convertir indices a coordenadas (x, y)
             
-            self.path = bspline_planning(path,len(path)*2) #Corrección de ruta con BSpline. (Suavizar la ruta) (antes len*5)
+            self.path = bspline_planning(path) #Corrección de ruta con BSpline. (Suavizar la ruta)
             print("Ubicacion del Robot: ",self.x,self.y)
+            self.giros= self.count_turns(self.path)
             
             #Mods para el path:
             # Publicar el path en el tópico 'planned_path'
@@ -282,22 +272,15 @@ class navigationControl(Node):
                 pose.pose.position.z = 0.0
                 pose.pose.orientation.w = 1.0  # Sin rotación
                 path_msg.poses.append(pose)
-
-
-            self.path_1 = self.get_clock().now()
-
-            self.pathBuildTime = ((self.path_1 - self.path_0).nanoseconds / 1e9)
             
             ##calculo de distancia path
             self.path_length(self.path)
-            
-            
-            self.move_0 = self.get_clock().now()
 
             self.path_publisher.publish(path_msg)
 
             self.i = 0
-            
+            self.move_0 = self.get_clock().now()
+            self.get_logger().info('Path generado! Publicando twist')
             self.flag = 2
 
     def path_length(self, path):
@@ -308,29 +291,44 @@ class navigationControl(Node):
             self.total_length += math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
         return self.total_length
     
+    def count_turns(self, path):
+        if len(path) < 3:  # Se necesitan al menos 3 puntos para detectar un giro
+            return 0
+
+        turns = 0
+        prev_dx, prev_dy = path[1][0] - path[0][0], path[1][1] - path[0][1]
+
+        for i in range(1, len(path) - 1):
+            dx, dy = path[i+1][0] - path[i][0], path[i+1][1] - path[i][1]
+
+            if (dx, dy) != (prev_dx, prev_dy):  # Si cambia la dirección, es un giro
+                turns += 1
+
+            prev_dx, prev_dy = dx, dy  # Actualizar la dirección previa
+
+        return turns
+
     def printData(self, heuristic):
         self.get_logger().info(f'Guardando datos en el archivo')
 
         with open('tablaDatos.csv', mode="a", newline="") as file:  
             writer = csv.writer(file)
 
-            # Escribir un separador identificando la simulación
-            writer.writerow([f'--- Simulación {heuristic.__name__} ---'])
-
             # Escribir los datos de la simulación
             writer.writerow([
+                f'{heuristic.__name__}',
                 aproximar_a_cero(self.goal[0]),
                 aproximar_a_cero(self.goal[1]),
-                self.pathBuildTime,
-                self.time_moverse,
-                self.timeGoal,
-                self.total_length
+                self.pathBuildTime, # tiempo que se calcula el path
+                self.time_moverse, # tiempo que se mueve el robot
+                self.timeGoal,  # desde que se recibe el goalpose hasta que llega al destino.
+                self.total_length, # distancia del path generado
+                self.giros # número de giros del path
             ])
             writer.writerow([]) #en blanco
 
     def timer_callback(self):  ##Funcion para publicar las velocidades calculadas en Pure Pursuit. Ademas verifica si el robot ha llegado al ultimo pose del PATH   
         if self.flag == 2:
-            self.get_logger().info('Path generado! Publicando twist')
             twist = Twist()
             twist.linear.x , twist.angular.z,self.i = pure_pursuit(self.x,self.y,self.yaw,self.path,self.i, navigationControl=self)
                 
@@ -369,7 +367,7 @@ class navigationControl(Node):
                 self.goal_1 = self.get_clock().now()
                 
                 self.timeGoal = ((self.goal_1 - self.goal_0).nanoseconds / 1e9)
-                #CALCULO LONGITUD PATH ROBOT 
+
                 self.puntos_recorridos = []
                 self.printData(self.heuristic)
                 print("Objetivo alcanzado!!\nEsperando nuevo objetivo...")

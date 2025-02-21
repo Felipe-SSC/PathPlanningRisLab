@@ -26,6 +26,7 @@ setup(
         	'manhattanA = nav_controller.manhattanAstar:main',
             'euclideanA = nav_controller.euclideanAstar:main',
             'djikstra = nav_controller.dijkstra:main',
+            'octileA = nav_controller.octileAstar:main',
             'meta = nav_controller.meta:main',
             'regreso = nav_controller.inicio:main',
             'mapeo1 = nav_controller.mapeo1:main',

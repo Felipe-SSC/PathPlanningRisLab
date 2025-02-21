@@ -41,5 +41,5 @@ def generate_launch_description():
         gazebo,
         rviz2,
         slam_toolbox,
-        #mapeo,
+        mapeo,
     ])

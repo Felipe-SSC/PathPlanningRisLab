@@ -120,11 +120,9 @@ class navigationControl(Node):
         self.goal_1 = 0
         self.path_0 = 0
         self.path_1 = 0
-        self.total_length = 0
-        self.flag_logger = 0
-        #CALCULO LONGITUD PATH ROBOT 
+        self.total_length = 0 
         self.puntos_recorridos = []
-    
+        self.giros = 0
     
     def publish_marker(self, x, y):
         marker = Marker()
@@ -184,11 +182,15 @@ class navigationControl(Node):
             
             path = dijkstra(self, data,(row,column),(rowH,columnH)) #Busqueda de ruta con Dijkstra
             ## -> Resulta en una lista de indices (fila, columna) que representa la ruta.
+            self.path_1 = self.get_clock().now()
+
+            self.pathBuildTime = ((self.path_1 - self.path_0).nanoseconds / 1e9)
             
             path = [(p[1]*resolution+originX,p[0]*resolution+originY) for p in path] #Convertir indices a coordenadas (x, y)
             
-            self.path = bspline_planning(path,len(path)*2) #Corrección de ruta con BSpline. (Suavizar la ruta)
+            self.path = bspline_planning(path) #Corrección de ruta con BSpline. (Suavizar la ruta)
             print("Ubicacion del Robot: ",self.x,self.y)
+            self.giros= self.count_turns(self.path)
             
             #Mods para el path:
             # Publicar el path en el tópico 'planned_path'
@@ -206,21 +208,17 @@ class navigationControl(Node):
                 pose.pose.orientation.w = 1.0  # Sin rotación
                 path_msg.poses.append(pose)
 
-
-            self.path_1 = self.get_clock().now()
-
-            self.pathBuildTime = ((self.path_1 - self.path_0).nanoseconds / 1e9)
-            
             ##calculo de distancia path
             self.path_length(self.path)
             self.get_logger().info(f'La distancia total es: {self.total_length}')
             
-            self.move_0 = self.get_clock().now()
+            
 
             self.path_publisher.publish(path_msg)
 
             self.i = 0
-            
+            self.move_0 = self.get_clock().now()
+            self.get_logger().info('Path generado! Publicando twist')
             self.flag = 2
 
     def path_length(self, path):
@@ -230,6 +228,23 @@ class navigationControl(Node):
             x2, y2 = path[i + 1]
             self.total_length += math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
         return self.total_length
+    
+    def count_turns(self, path):
+            if len(path) < 3:  # Se necesitan al menos 3 puntos para detectar un giro
+                return 0
+
+            turns = 0
+            prev_dx, prev_dy = path[1][0] - path[0][0], path[1][1] - path[0][1]
+
+            for i in range(1, len(path) - 1):
+                dx, dy = path[i+1][0] - path[i][0], path[i+1][1] - path[i][1]
+
+                if (dx, dy) != (prev_dx, prev_dy):  # Si cambia la dirección, es un giro
+                    turns += 1
+
+                prev_dx, prev_dy = dx, dy  # Actualizar la dirección previa
+
+            return turns
 
     def printData(self):
         self.get_logger().info(f'Guardando datos en el archivo')
@@ -237,17 +252,16 @@ class navigationControl(Node):
         with open('tablaDatos.csv', mode="a", newline="") as file:  
             writer = csv.writer(file)
 
-            # Escribir un separador identificando la simulación
-            writer.writerow([f'--- Simulación {SIMULACION} ---'])
-
             # Escribir los datos de la simulación
             writer.writerow([
+                f'{SIMULACION}',
                 aproximar_a_cero(self.goal[0]),
                 aproximar_a_cero(self.goal[1]),
                 self.pathBuildTime,
                 self.time_moverse,
                 self.timeGoal,
-                self.total_length
+                self.total_length,
+                self.giros
             ])
             writer.writerow([]) #en blanco
 
@@ -317,7 +331,7 @@ def main(args=None):
 
         # Si el archivo no existe o está vacío, escribir los encabezados
         if not file_exists:
-            writer.writerow(["X Deseada", "Y Deseada", "Tiempo Path Building", "Tiempo de Trayectoria", "Tiempo Total", "Distancia Total"])
+            writer.writerow(["Simulación","X Deseada", "Y Deseada", "Tiempo Path Building", "Tiempo de Trayectoria", "Tiempo Total", "Distancia Total","Numero de Giros"])
 
 
     rclpy.init(args=args)

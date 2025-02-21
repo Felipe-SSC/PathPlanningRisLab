@@ -86,6 +86,8 @@ class Trajectory(Node):
             self.posX_deseada = self.posX_list[self.index]
             self.posY_deseada = self.posY_list[self.index]
 
+            #self.get_logger().info(f'Navegando a la posicion (x = {self.posX_deseada}, y = {self.posY_deseada})')
+
             # Fase 1 : Rotacion 
             if self.fase == 1:
                 self.anguloDeseado = math.atan2(self.posY_deseada - self.posY, self.posX_deseada - self.posX)

@@ -1,7 +1,6 @@
 import rclpy
 import os
 import csv
-
 from nav_controller.funcionesAstar import *
 
 def heuristic(a, b):
@@ -12,6 +11,8 @@ def heuristic(a, b):
     return manhattan
 
 heuristic.__name__ = "Astar-Manhattan"
+
+
 
 def main(args=None):
 
@@ -25,7 +26,7 @@ def main(args=None):
 
         # Si el archivo no existe o está vacío, escribir los encabezados
         if not file_exists:
-            writer.writerow(["X Deseada", "Y Deseada", "Tiempo Path Building", "Tiempo de Trayectoria", "Tiempo Total", "Distancia Total"])
+            writer.writerow(["Simulacion", "X Deseada", "Y Deseada", "Tiempo Path Building", "Tiempo de Trayectoria", "Tiempo Total", "Distancia Total","Numero de Giros"])
 
 
     rclpy.init(args=args)

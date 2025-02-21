@@ -65,9 +65,19 @@ class PosePublisher(Node):
         goal_pose.header.stamp = self.get_clock().now().to_msg()  # Tiempo actual
         goal_pose.header.frame_id = 'map'  # Marco de referencia
 
-        # Llenar la pose
-        goal_pose.pose.position.x = -0.013509
-        goal_pose.pose.position.y = 2.0156
+        # Pose test1
+        # goal_pose.pose.position.x = -0.013509
+        # goal_pose.pose.position.y = 2.0156
+        # goal_pose.pose.position.z = 0.0
+
+        #pose test2
+        # goal_pose.pose.position.x = 2.0
+        # goal_pose.pose.position.y = 4.0
+        # goal_pose.pose.position.z = 0.0
+
+        #Pose test3
+        goal_pose.pose.position.x = -2.0
+        goal_pose.pose.position.y = 0.0
         goal_pose.pose.position.z = 0.0
 
         goal_pose.pose.orientation.x = 0.0
