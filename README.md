@@ -81,59 +81,34 @@ Para comenzar a simular, es necesario realizar algunas configuraciones relaciona
       export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:~/turtlebot3/install/turtlebot3_gazebo/share/turtlebot3_gazebo/models >> ~/.bashrc
       source ~/.bashrc
   ```
-### Mundo en Gazebo:
-Para la simulación en un entorno básico, destinado a evaluar el comportamiento del script y mapeo en condiciones óptimas se debe realizar lo siguiente:
-```bash
-  source install/setup.bash
-  ros2 launch turtlebot3_gazebo test1_world.launch.py
-  ```
-Para la simulacion en un "entorno agrícola", destinado a evaluar el comportamiento del script y mapeo frente a obstaculos naturales se debe realizar lo siguiente:
-```bash
-  source install/setup.bash
-  ros2 launch turtlebot3_gazebo trees_test1.launch.py
-  ```
-### Mapeo (SLAM)
-Para realizar un mapeo del entorno haciendo uso del LiDAR se debe realizar lo siguiente:
-```bash
-  ros2 launch slam_toolbox online_async_launch.py
-  ```
-### Movimiento del robot:
-Para mover el robot en el mundo simulado se puede realizar de la siguiente manera:
-#### Paquete teleop_twist_keyboard:
-```bash
-  ros2 run teleop_twist_keyboard teleop_twist_keyboard
-  ```
 ### Path Planning y navegación autónoma:
 Para producir un path que seguirá el robot, es necesario lo siguiente:
-1. Tener el area de navegación previamente mapeada
-2. rviz2 abierto con el fixed frame 'map'
-3. Ejecutar el script de Path Planning:
+1. Ejecutar el launch del test deseado a realizar (reemplazar testx por el numero de test que se quiere ejecutar)
+  ```bash
+  ros2 launch nav_controller test1.launch.py
+  ```
+2. Ejecutar el nodo de Path Planning que se quiere evaluar:
 ```bash
   ros2 run nav_controller euclideanA
-  ```
-o
-```bash
   ros2 run nav_controller manhattanA
+  ros2 run nav_controller octileA
+  ros2 run nav_controller dijkstra
   ```
-
-o
-```bash
-  ros2 run nav_controller djikstra
-  ```
-4. Otorgar Goal Pose y 2D Estimated Pose
+3. Otorgar Goal Pose y 2D Estimated Pose
    Se puede realizar a través de Rviz2 o ejecutando el siguiente archivo:
    (Entrega la pose estimada del inicio y el goal pose al otro lado del mapa)
    ```bash
     ros2 run nav_controller meta
     ```
 5. Visualizar resultados:
-   El script permite visualizar en rviz2 el path a seguir, y además escribe en un .csv que contiene datos relevantes respecto al rendimiento del robot en su simulacion.
+   El launch file de cada test permite visualizar en rviz2 el path a seguir, el punto de Pure Pursuit y a través de este, el trayecto real que sigue el robot.
+   Además escribe en un .csv los datos relevantes respecto al rendimiento de cada algoritmo en la simulacion.
 > [!WARNING]
  > Si el destino esta en un sector 'desconocido' o 'ocupado' el robot planeará una trayectoria hasta el ultimo punto conocido
 
 > [!NOTE]
 > Respecto al paquete nav_controller:
 > El paquete presente en el repositorio cuenta con cambios específicos realizados al paquete original producido por abdulkadrtr (https://github.com/abdulkadrtr/ROS2-PurePursuitControl-PathPlanning-Tracking).
-> Los cambios corresponden a modificaciones del script para recopilar información, asi como para implementar dos métodos de calculo de distancia al momento de generar una trayectoria.
+> Los cambios corresponden a modificaciones del script para recopilar información, asi como para implementar dos métodos de calculo de distancia al momento de generar una trayectoria. Por otro lado se añadieron archivos y funciones para facilitar la evaluación de los algoritmos.
 
    
