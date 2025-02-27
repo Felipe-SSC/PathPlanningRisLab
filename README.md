@@ -13,7 +13,6 @@ A continuación se encuentran las instrucciones para poder visualizar el funcion
 <img src="https://github.com/user-attachments/assets/123f13f1-65b8-402f-8b0d-7e75255ac4a5" width="250"> <img src="https://github.com/user-attachments/assets/8fd84ff0-b1cc-48d2-97b8-e3237de19785" width="180"> <img src="https://github.com/user-attachments/assets/0dd92039-57a7-4a97-81bf-12015330f50e" width="345">
 
 
-
 ## Instalación ROS2-Humble:
 
 LINK: https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html
@@ -103,6 +102,12 @@ Para producir un path que seguirá el robot, es necesario lo siguiente:
 5. Visualizar resultados:
    El launch file de cada test permite visualizar en rviz2 el path a seguir, el punto de Pure Pursuit y a través de este, el trayecto real que sigue el robot.
    Además escribe en un .csv los datos relevantes respecto al rendimiento de cada algoritmo en la simulacion.
+
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/19d32633-7fcb-420b-a797-dada0b60d395" width="340">
+</div>
+
+   
 > [!WARNING]
  > Si el destino esta en un sector 'desconocido' o 'ocupado' el robot planeará una trayectoria hasta el ultimo punto conocido
 
