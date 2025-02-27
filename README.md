@@ -9,9 +9,9 @@ A continuación se encuentran las instrucciones para poder visualizar el funcion
 5. slam_toolbox
 6. rviz2
 7. nav_controller de este repositorio.
-<div align="center">
-  <img src="https://github.com/user-attachments/assets/c1c97960-ff65-4a18-b758-3eaf8a0c6e68" alt="Pure Pursuit" width="600">
-</div>
+
+<img src="https://github.com/user-attachments/assets/123f13f1-65b8-402f-8b0d-7e75255ac4a5" width="200"> <img src="https://github.com/user-attachments/assets/8fd84ff0-b1cc-48d2-97b8-e3237de19785" width="142"> <img src="https://github.com/user-attachments/assets/0dd92039-57a7-4a97-81bf-12015330f50e" width="270">
+
 
 
 ## Instalación ROS2-Humble:
