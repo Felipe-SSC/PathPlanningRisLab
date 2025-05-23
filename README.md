@@ -69,6 +69,7 @@ LINK del tutorial: https://emanual.robotis.com/docs/en/platform/turtlebot3/simul
     ```bash
     mkdir -p ~/turtlebot3/src && cd ~/turtlebot3/src
     git clone -b humble https://github.com/ROBOTIS-GIT/turtlebot3.git
+    git clone -b humble https://github.com/ROBOTIS-GIT/turtlebot3_simulations.git
     git clone https://github.com/Felipe-SSC/PathPlanningRisLab.git
     cd ~/turtlebot3_ws && colcon build --symlink-install
     ```
